@@ -28,7 +28,7 @@ for name, data_frames in datas.items():
     plt.title(name)
     plt.legend()
     plt.savefig("results/figure/mean_{}.png".format(name))
-    
+    plt.close()
     #plt.show()
 
 
