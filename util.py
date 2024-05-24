@@ -72,4 +72,6 @@ class IMU_data:
     
     def get_filterd_data(self):
         return self.filterd_datas
-    
+
+
+

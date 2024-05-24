@@ -21,10 +21,14 @@ for name, data_frames in datas.items():
         data = df[columns_list].to_numpy()
         data_len = data.shape[0]
         data_array[i, :data_len, :] = data
-        
+
     #データの加工
     imu = IMU_data(name, data_array, thred_rasio=0.2, num_roll_back= 10)
-    plt.plot(np.mean(imu.cliped_datas, axis = 0))
+    plt.plot(np.mean(imu.cliped_datas, axis = 0), label = columns_list)
+    plt.title(name)
+    plt.legend()
+    plt.savefig("results/figure/mean_{}.png".format(name))
+    
     #plt.show()
 
 
