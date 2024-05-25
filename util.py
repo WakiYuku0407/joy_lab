@@ -11,12 +11,20 @@ from sklearn import tree
 from sklearn.model_selection import train_test_split
 from sklearn.model_selection import cross_val_score, cross_validate
 
+from sklearn.svm import SVC
+from sklearn.ensemble import RandomForestClassifier
+import xgboost as xgb
+from sklearn.cluster import KMeans
+from sklearn.neural_network import MLPClassifier
+
 #下記は決定木可視化のためのツール
 import graphviz
 import pydotplus
 from IPython.display import Image
 from io import StringIO
-
+#=====================================================
+#関数
+#=====================================================
 def get_trial_csv_files(directory):
     # ディレクトリ内のすべてのファイル名を取得
     files = os.listdir(directory)
@@ -28,6 +36,30 @@ def get_trial_csv_files(directory):
     data_frames = [pd.read_csv(file) for file in trial_csv_files]
     return data_frames
 
+def plotter(datas, title, columns_list):
+    #加工後のデータの表示
+    fig, axes = plt.subplots(6, 1, figsize=(8, 16)) 
+    for i, ax in enumerate(axes):
+        #ax.plot(np.mean(imu.normalized_datas, axis = 0)[:, i], label = columns_list[i])
+        ax.plot(datas[:, :,  i].T)
+        ax.set_title(columns_list[i])
+    plt.suptitle(title)
+    plt.tight_layout()
+    plt.savefig("results/figure/mean_{}.png".format(title))
+    plt.close()
+
+def dataframes2ndarray(data_frames, columns_list, num_dim):
+    #取り合えず100フレームで統一残りはゼロパディング
+    data_array = np.zeros((len(data_frames), 120, num_dim))
+    for i, df in enumerate(data_frames):
+        data = df[columns_list].to_numpy()
+        data_len = data.shape[0]
+        data_array[i, :data_len, :] = data
+    return data_array
+
+#=====================================================
+#クラス
+#=====================================================  
 
 class IMU_data:
     def __init__(self, name, datas, sampling = 60,  cutoff_freq = 20, threshold = 2, thred_rasio = 0.2, num_roll_back = 10):
@@ -129,11 +161,11 @@ class Classifier:
             self.train_labels = np.concatenate((self.train_labels, train_labels))
             self.test_labels = np.concatenate((self.test_labels, test_labels))
 
-    def fit_decision_tree(self):
+    def validate_decision_tree(self):
         clf = DecisionTreeClassifier()
         #交差検証
         scores = cross_val_score(clf, self.datas, self.labels, cv = self.cv)
-        self.clossval_scores["DecisionTree:"] = scores.mean()
+        self.clossval_scores["DecisionTree"] = scores.mean()
 
         # クロスバリデーションを実行して各分割の重要度を取得
         cv_results = cross_validate(clf, self.datas, self.labels, cv=self.cv, return_estimator=True)
@@ -155,4 +187,22 @@ class Classifier:
         plt.savefig("{}/figure/decision_tree.png".format(self.save_path))
         plt.close()
 
-        
+    def validate_svm(self):
+        clf = SVC(kernel='linear')
+        score = cross_val_score(clf, self.datas, self.labels, cv=self.cv)
+        self.clossval_scores["SVM"] = score.mean() 
+
+    def validate_random_forest(self):
+        clf = RandomForestClassifier(n_estimators=100)
+        score = cross_val_score(clf, self.datas, self.labels, cv=self.cv)
+        self.clossval_scores["random_forest"] = score.mean() 
+
+    def validate_xgboost(self):
+        clf = xgb.XGBClassifier(objective='multi:softmax', num_class=3)
+        score = cross_val_score(clf, self.datas, self.labels, cv=self.cv)
+        self.clossval_scores["xgboost"] = score.mean() 
+
+    def validate_mlp(self):
+        clf = MLPClassifier(hidden_layer_sizes=(400,400,300), max_iter=1000)
+        score = cross_val_score(clf, self.datas, self.labels, cv=self.cv)
+        self.clossval_scores["MLP"] = score.mean() 
