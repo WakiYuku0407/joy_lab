@@ -4,12 +4,14 @@ import matplotlib.pyplot as plt
 import fnmatch
 import os
 import scipy.signal as signal
+import seaborn as sns
 
 from sklearn.tree import DecisionTreeClassifier, export_graphviz
 from sklearn.metrics import accuracy_score
 from sklearn import tree
 from sklearn.model_selection import train_test_split
-from sklearn.model_selection import cross_val_score, cross_validate
+from sklearn.model_selection import cross_val_score, cross_validate, cross_val_predict
+from sklearn.metrics import confusion_matrix
 
 from sklearn.svm import SVC
 from sklearn.ensemble import RandomForestClassifier
@@ -19,7 +21,7 @@ from sklearn.neural_network import MLPClassifier
 
 #下記は決定木可視化のためのツール
 import graphviz
-import pydotplus
+#import pydotplus
 from IPython.display import Image
 from io import StringIO
 #=====================================================
@@ -142,8 +144,10 @@ class Classifier:
         self.culumns_list = columns_list
         self.clossval_scores = {}
         self.save_path = save_path
+        self.label_names = []
 
     def append_data_array(self, data, class_name):
+        self.label_names.append(class_name)
         num_sample = data.shape[0]
         data = data.reshape(num_sample, -1)
         labels = np.full(num_sample, class_name)
@@ -162,10 +166,10 @@ class Classifier:
             self.test_labels = np.concatenate((self.test_labels, test_labels))
 
     def validate_decision_tree(self):
+        model_name = "DecisionTree"
         clf = DecisionTreeClassifier()
         #交差検証
-        scores = cross_val_score(clf, self.datas, self.labels, cv = self.cv)
-        self.clossval_scores["DecisionTree"] = scores.mean()
+        self.cross_validate(clf, model_name)
 
         # クロスバリデーションを実行して各分割の重要度を取得
         cv_results = cross_validate(clf, self.datas, self.labels, cv=self.cv, return_estimator=True)
@@ -188,21 +192,37 @@ class Classifier:
         plt.close()
 
     def validate_svm(self):
+        model_name = "SVM"
         clf = SVC(kernel='linear')
-        score = cross_val_score(clf, self.datas, self.labels, cv=self.cv)
-        self.clossval_scores["SVM"] = score.mean() 
+        self.cross_validate(clf, model_name)
 
     def validate_random_forest(self):
+        model_name = "random_forest"
         clf = RandomForestClassifier(n_estimators=100)
-        score = cross_val_score(clf, self.datas, self.labels, cv=self.cv)
-        self.clossval_scores["random_forest"] = score.mean() 
+        self.cross_validate(clf, model_name)
 
     def validate_xgboost(self):
+        model_name = "xgboost"
         clf = xgb.XGBClassifier(objective='multi:softmax', num_class=3)
-        score = cross_val_score(clf, self.datas, self.labels, cv=self.cv)
-        self.clossval_scores["xgboost"] = score.mean() 
+        self.cross_validate(clf, model_name)
 
     def validate_mlp(self):
+        model_name = "MLP"
         clf = MLPClassifier(hidden_layer_sizes=(400,400,300), max_iter=1000)
+        self.cross_validate(clf, model_name)
+
+    def cross_validate(self, clf, model_name):
         score = cross_val_score(clf, self.datas, self.labels, cv=self.cv)
-        self.clossval_scores["MLP"] = score.mean() 
+        y_pred = cross_val_predict(clf, self.datas, self.labels, cv=self.cv)
+        self.make_confusion_matrix(self.labels, y_pred, model_name=model_name)
+        self.clossval_scores[model_name] = score.mean() 
+
+    def make_confusion_matrix(self, y, y_pred, model_name):
+        cm = confusion_matrix(y, y_pred)
+        plt.figure(figsize=(8,6))
+        sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', xticklabels=self.label_names, yticklabels=self.label_names)
+        plt.xlabel('Predicted labels')
+        plt.ylabel('True labels')
+        plt.title('Confusion Matrix : {}'.format(model_name))
+        plt.savefig("{}/figure/confusion_matrix/{}_confusion_matrix.png".format(self.save_path, model_name))
+        plt.close()
