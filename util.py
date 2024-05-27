@@ -43,7 +43,7 @@ def plotter(datas, title, columns_list):
     fig, axes = plt.subplots(6, 1, figsize=(8, 16)) 
     for i, ax in enumerate(axes):
         #ax.plot(np.mean(imu.normalized_datas, axis = 0)[:, i], label = columns_list[i])
-        ax.plot(datas[:, :,  i].T)
+        ax.plot(datas[:, i].T)
         ax.set_title(columns_list[i])
     plt.suptitle(title)
     plt.tight_layout()
@@ -51,8 +51,8 @@ def plotter(datas, title, columns_list):
     plt.close()
 
 def dataframes2ndarray(data_frames, columns_list, num_dim):
-    #取り合えず100フレームで統一残りはゼロパディング
-    data_array = np.zeros((len(data_frames), 120, num_dim))
+    #取り合えず200フレームで統一残りはゼロパディング
+    data_array = np.zeros((len(data_frames), 200, num_dim))
     for i, df in enumerate(data_frames):
         data = df[columns_list].to_numpy()
         data_len = data.shape[0]
@@ -81,8 +81,6 @@ class IMU_data:
         self.norm_datas    = self.culc_acc_norm(self.filterd_datas)
         self.cliped_datas  = self.clip_by_threshold(self.filterd_datas)
         self.normalized_datas = self.get_normalize_data(self.cliped_datas)
-        # self.norm_datas    = self.culc_acc_norm(self.law_datas)
-        # self.cliped_datas  = self.clip_by_threshold(self.law_datas)
 
     def filtering_data(self, data):
         #3次のバターワースフィルター
@@ -147,9 +145,10 @@ class Classifier:
         self.label_names = []
 
     def append_data_array(self, data, class_name):
-        self.label_names.append(class_name)
+        if not class_name in self.label_names:
+            self.label_names.append(class_name)
         num_sample = data.shape[0]
-        data = data.reshape(num_sample, -1)
+        data = data.reshape(num_sample, -1) #平坦化
         labels = np.full(num_sample, class_name)
         train_datas, test_datas, train_labels, test_labels = train_test_split(data, labels, test_size = self.test_split_rasio)
         if np.any(self.train_datas) == None:
@@ -186,7 +185,7 @@ class Classifier:
         plt.yticks(range(len(feature)), self.culumns_list, fontsize=14)
         plt.savefig("{}/figure/decision_tree_mean_feature.png".format(self.save_path))
 
-        #訓練データの精度
+        #分類木の保存
         tree.plot_tree(clf)
         plt.savefig("{}/figure/decision_tree.png".format(self.save_path))
         plt.close()
@@ -218,6 +217,9 @@ class Classifier:
         self.clossval_scores[model_name] = score.mean() 
 
     def make_confusion_matrix(self, y, y_pred, model_name):
+        #print(y)
+        labels = np.unique(y)
+        #print(labels)
         cm = confusion_matrix(y, y_pred)
         plt.figure(figsize=(8,6))
         sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', xticklabels=self.label_names, yticklabels=self.label_names)
